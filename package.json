@@ -1,0 +1,64 @@
+{
+  "name": "douyin",
+  "productName": "douyin",
+  "author": "oceanx",
+  "version": "0.0.1",
+  "description": "douyin download",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "main": "main.js",
+  "devDependencies": {
+    "@electron-forge/cli": "^6.0.0-beta.66",
+    "@electron-forge/maker-deb": "^6.0.0-beta.66",
+    "@electron-forge/maker-rpm": "^6.0.0-beta.66",
+    "@electron-forge/maker-squirrel": "^6.0.0-beta.66",
+    "@electron-forge/maker-zip": "^6.0.0-beta.66",
+    "electron": "^20.2.0"
+  },
+  "dependencies": {
+    "@electron-forge/maker-wix": "^6.0.0-beta.66",
+    "axios": "^0.27.2",
+    "date-fns": "^2.29.3",
+    "electron-squirrel-startup": "^1.0.0",
+    "express": "^4.18.1",
+    "file-saver": "^2.0.5",
+    "playwright": "^1.26.0",
+    "sanitize-filename": "^1.6.3"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {},
+      "makers": [
+        {
+          "name": "@electron-forge/maker-wix",
+          "config": {
+            "language": 1033,
+            "manufacturer": "My Awesome Company",
+            "appIconPath": "./buzz.ico"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {}
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "darwin"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "config": {}
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "config": {}
+        }
+      ]
+    }
+  }
+}
