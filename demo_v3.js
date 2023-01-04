@@ -3,15 +3,13 @@ const fs = require("fs");
 const sanitize = require("sanitize-filename");
 const util = require("util");
 const stream = require("stream");
-const { exit } = require("process");
-const { chromium, firefox, webkit } = require("playwright");
+const { firefox } = require("playwright");
 // const pipeline = util.promisify(stream.pipeline);
 const finished = util.promisify(stream.finished);
 
 async function get_detail(url) {
   let id = "";
-  let api_url =
-    "https://www.iesdouyin.com/web/api/v2/aweme/iteminfo/?item_ids=";
+  let api_url = "https://www.iesdouyin.com/aweme/v1/web/aweme/detail/?aweme_id=";
 
   if (url.includes("https://www.douyin.com/note/")) {
     id = url.replace("https://www.douyin.com/note/", "");
@@ -20,7 +18,7 @@ async function get_detail(url) {
   } else {
     throw "invalid url";
   }
-  let target_url = api_url + id;
+  let target_url = api_url + id + "&aid=1128&version_name=23.5.0&device_platform=android&os_version=2333";
   let detail = {};
   let headers = [
     "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
@@ -43,28 +41,15 @@ async function get_detail(url) {
     },
     timeout: 1000,
   }).then((res) => {
-    result = res.data.item_list[0];
-
-    process.stdout.write(
-      "\u001b[32m" + "nickname: " + result["author"]["nickname"] + "  "
-    );
-    process.stdout.write(
-      "\u001b[31m" + result["desc"] + "  \r\n" + "\u001b[0m"
-    );
-    // console.log("desc: " + result["desc"]);
+    result = res.data["aweme_detail"];
+    process.stdout.write("\u001b[32m" + "nickname: " + result["author"]["nickname"] + "  ");
+    process.stdout.write("\u001b[31m" + result["desc"] + "  \r\n" + "\u001b[0m");
     // if is video
     if (result["images"] == null) {
       detail["type"] = "video";
-      detail["url"] = result["video"]["play_addr"]["url_list"][0].replace(
-        "playwm",
-        "play"
-      );
+      detail["url"] = result["video"]["bit_rate"][0]["play_addr"]["url_list"][0];
       detail["nickname"] = result["author"]["nickname"];
       detail["desc"] = result["desc"];
-      // console.log(
-      //   "video_url: " +
-      //     result["video"]["play_addr"]["url_list"][0].replace("playwm", "play")
-      // );
     } else {
       // if is pic
       detail["type"] = "image";
@@ -74,7 +59,6 @@ async function get_detail(url) {
       let images = result["images"];
       for (let i in images) {
         detail["url"].push(images[i]["url_list"][3]);
-        // console.log("image: " + images[i]["url_list"][0]);
       }
     }
   });
@@ -104,9 +88,7 @@ async function run() {
   target = fs.readFileSync(target_file_path, "utf-8").split("\r\n");
   let detail = "";
   let previous_count = 0;
-  // let output_folder = __dirname + "\\video\\";
-  let output_folder =
-    "C:\\Users\\oceanx\\AppData\\Local\\douyin\\app-0.0.1\\resources\\app\\video\\";
+  let output_folder = "C:\\Users\\oceanx\\AppData\\Local\\douyin\\app-0.0.1\\resources\\app\\video\\";
   while (!cancel) {
     // get file list of video folder
     let file_list = fs.readdirSync(output_folder);
@@ -115,48 +97,25 @@ async function run() {
       try {
         detail = await get_detail(target[i]);
         // check if exist
-        let tmp1 =
-          sanitize(detail["nickname"] + "_" + detail["desc"]).substring(
-            0,
-            170
-          ) + ".mp4";
-        let tmp2 =
-          sanitize(detail["nickname"] + "_" + detail["desc"]).substring(
-            0,
-            170
-          ) +
-          "_0" +
-          ".jpg";
+        let tmp1 = sanitize(detail["nickname"] + "_" + detail["desc"]).substring(0, 170) + ".mp4";
+        let tmp2 = sanitize(detail["nickname"] + "_" + detail["desc"]).substring(0, 170) + "_0" + ".jpg";
         if (file_list.includes(tmp1) || file_list.includes(tmp2)) {
           process.stdout.write("exist\r\n");
           continue;
         }
         if (detail["type"] == "video") {
-          let filename = sanitize(
-            detail["nickname"] + "_" + detail["desc"]
-          ).substring(0, 170) + ".mp4";
+          let filename = sanitize(detail["nickname"] + "_" + detail["desc"]).substring(0, 170) + ".mp4";
           await download(detail["url"], output_folder + filename);
         } else if (detail["type"] == "image") {
           for (let j in detail["url"]) {
-            let filename =
-              sanitize(detail["nickname"] + "_" + detail["desc"]).substring(
-                0,
-                170
-              ) +
-              "_" +
-              j +
-              ".jpg";
+            let filename = sanitize(detail["nickname"] + "_" + detail["desc"]).substring(0, 170) + "_" + j + ".jpg";
             await download(detail["url"][j], output_folder + filename);
           }
         }
       } catch (e) {
-        fs.writeFileSync(
-          log_file_path,
-          new Date() + " " + target[i] + " : " + e + "\r\n",
-          {
-            flag: "a",
-          }
-        );
+        fs.writeFileSync(log_file_path, new Date() + " " + target[i] + " : " + e + "\r\n", {
+          flag: "a",
+        });
         // write to error.txt
         fs.writeFileSync(error_file_path, target[i] + "\r\n", {
           flag: "a",
@@ -176,17 +135,15 @@ async function run() {
   console.log("please manually check errors.txt");
 }
 
-var like_tab =
-  "https://www.douyin.com/user/<TODO>?showTab=like";
+var like_tab = "https://www.douyin.com/user/MS4wLjABAAAAEtx9PZ1XhEw-eB4fUg_t4M9OnspG38qgWLZW4cG4yrc?showTab=like";
 var context = null;
 var browser = null;
-var LIMIT = 200;
-var isheadless = true;
+var LIMIT = 1000;
+var isheadless = false;
 async function init() {
   browser = await firefox.launch({ headless: isheadless });
   context = await browser.newContext({
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0",
     viewport: { width: 2000, height: 1000 },
   });
   context.setDefaultTimeout(1000000000);
@@ -199,10 +156,22 @@ async function get_likes() {
   let address = [];
   const page = await context.newPage();
   await page.goto(like_tab);
+
+  //wait for appearance
+  await page.waitForSelector(".captcha_verify_container", {
+    state: "attached",
+  });
+  // wait for its disappearance
+  await page.waitForSelector(".captcha_verify_container", {
+    state: "detached",
+  });
+  // wait for the web version to load
+  await page.waitForSelector(".dy-account-close", {
+    state: "attached",
+  });
+
   // check which web version is used.
-  const web_version = page.locator(
-    "div.FeJSrpNN:nth-child(3) > ul:nth-child(1)"
-  );
+  const web_version = page.locator("div.FeJSrpNN:nth-child(3) > ul:nth-child(1)");
   let mobile_like = await web_version.count();
   if (!mobile_like) {
     while (true) {
@@ -237,8 +206,6 @@ async function get_likes() {
       await page.evaluate(() => {
         window.scrollBy(0, window.innerHeight);
       });
-      // await page.waitForTimeout(1000);
-      //
       address = await page.evaluate((LIMIT) => {
         let address = [];
         let nodes = document.querySelector(".EZC0YBrG").childNodes;
@@ -254,7 +221,6 @@ async function get_likes() {
       }
     }
     fs.writeFileSync(target_file_path, address.join("\r\n"));
-    // console.log("DONE");
     browser.close();
     return true;
   } else {
