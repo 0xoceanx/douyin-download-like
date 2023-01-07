@@ -138,8 +138,8 @@ async function run() {
 var like_tab = "https://www.douyin.com/user/MS4wLjABAAAAEtx9PZ1XhEw-eB4fUg_t4M9OnspG38qgWLZW4cG4yrc?showTab=like";
 var context = null;
 var browser = null;
-var LIMIT = 1000;
-var isheadless = false;
+var LIMIT = 2000;
+var isheadless = true;
 async function init() {
   browser = await firefox.launch({ headless: isheadless });
   context = await browser.newContext({
@@ -157,18 +157,22 @@ async function get_likes() {
   const page = await context.newPage();
   await page.goto(like_tab);
 
-  //wait for appearance
-  await page.waitForSelector(".captcha_verify_container", {
-    state: "attached",
-  });
-  // wait for its disappearance
-  await page.waitForSelector(".captcha_verify_container", {
-    state: "detached",
-  });
-  // wait for the web version to load
-  await page.waitForSelector(".dy-account-close", {
-    state: "attached",
-  });
+  let mannul = 0;
+  //FIXME just find the verify page is sometimes appear
+  if (mannul) {
+    //wait for appearance
+    await page.waitForSelector(".captcha_verify_container", {
+      state: "attached",
+    });
+    // wait for its disappearance
+    await page.waitForSelector(".captcha_verify_container", {
+      state: "detached",
+    });
+    // wait for the web version to load
+    await page.waitForSelector(".dy-account-close", {
+      state: "attached",
+    });
+  }
 
   // check which web version is used.
   const web_version = page.locator("div.FeJSrpNN:nth-child(3) > ul:nth-child(1)");
