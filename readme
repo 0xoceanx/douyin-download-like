@@ -1,3 +1,6 @@
 1.change [like_tab] and [output_folder] in demo_v3.js
 2.npm install
 3.node main.js
+
+自用抖音批量下载我喜欢。参数都在demo_v3.js里面，可以自己改。
+视频多的话建议下固态里，hdd的iops太低了。卡爆文件管理器。

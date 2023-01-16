@@ -7,10 +7,24 @@ const { firefox } = require("playwright");
 // const pipeline = util.promisify(stream.pipeline);
 const finished = util.promisify(stream.finished);
 
+// params
+var keep_mode_on = false; // a flag
+var time_to_wait = 1000 * 60 * 10; //  10 min
+var like_tab = "https://www.douyin.com/user/MS4wLjABAAAAEtx9PZ1XhEw-eB4fUg_t4M9OnspG38qgWLZW4cG4yrc?showTab=like";
+var context = null; // global context
+var browser = null; // global browser
+var LIMIT = 17620; // when to close browser when loading enough video links
+var isheadless = true; // true for headless mode, if u wanna download massive video, maybe set it to false to solve the captcha mannuly
+var cookies = '__ac_nonce=063c42c00007615d738ba; __ac_signature=_02B4Z6wo00f01y00zYgAAIDAboxoUMv5wdMtFMkAAKiT98; __ac_referer=__ac_blank'; // cookies 
+//if not used, maybe api will response with 0 data. u can get cookie  mannuly in browser for use here. visit the api url in browser, and copy the cookie from the request header
+var target_config_path = __dirname + "\\config\\target.txt";
+var error_config_path = __dirname + "\\config\\error.txt";
+var log_config_path = __dirname + "\\config\\log.txt";
+var output_path = "E:\\NSFW\\TIKTOK\\"; // where to save the video
+
 async function get_detail(url) {
   let id = "";
   let api_url = "https://www.iesdouyin.com/aweme/v1/web/aweme/detail/?aweme_id=";
-
   if (url.includes("https://www.douyin.com/note/")) {
     id = url.replace("https://www.douyin.com/note/", "");
   } else if (url.includes("https://www.douyin.com/video/")) {
@@ -18,7 +32,7 @@ async function get_detail(url) {
   } else {
     throw "invalid url";
   }
-  let target_url = api_url + id + "&aid=1128&version_name=23.5.0&device_platform=android&os_version=2333";
+  let target_url = api_url + id + "&aid=1128&version_name=23.5.0&device_platform=android&os_version=2334";
   let detail = {};
   let headers = [
     "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
@@ -38,12 +52,17 @@ async function get_detail(url) {
     url: target_url,
     headers: {
       "User-Agent": headers[Math.floor(Math.random() * headers.length)],
+      "accept-encoding": "application/json",
+      'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+      'cache-control':'no-cache',
+      Cookie:cookies
+      
     },
     timeout: 1000,
   }).then((res) => {
-    result = res.data["aweme_detail"];
-    process.stdout.write("\u001b[32m" + "nickname: " + result["author"]["nickname"] + "  ");
-    process.stdout.write("\u001b[31m" + result["desc"] + "  \r\n" + "\u001b[0m");
+    let result = res.data["aweme_detail"];
+    process.stdout.write("\u001b[32m" + " " + result["author"]["nickname"] + "  ");
+    process.stdout.write("\u001b[31m" + result["desc"].replaceAll("\n",'')  + "\u001b[0m");
     // if is video
     if (result["images"] == null) {
       detail["type"] = "video";
@@ -80,28 +99,31 @@ async function download(url, output_filename) {
 async function run() {
   let cancel = false;
   console.log("start downloading");
-  const target_file_path = __dirname + "\\config\\target.txt";
-  const error_file_path = __dirname + "\\config\\error.txt";
-  const log_file_path = __dirname + "\\config\\log.txt";
+  const target_file_path = target_config_path;
+  const error_file_path = error_config_path;
+  const log_file_path = log_config_path;
   // init target and clear errors
   fs.writeFileSync(error_file_path, "");
   target = fs.readFileSync(target_file_path, "utf-8").split("\r\n");
   let detail = "";
   let previous_count = 0;
-  let output_folder = "C:\\Users\\oceanx\\AppData\\Local\\douyin\\app-0.0.1\\resources\\app\\video\\";
+  let output_folder = output_path;
+
   while (!cancel) {
     // get file list of video folder
     let file_list = fs.readdirSync(output_folder);
     for (let i in target) {
-      process.stdout.write(i + " ----- ");
+      process.stdout.write(i + " - ");
       try {
         detail = await get_detail(target[i]);
         // check if exist
         let tmp1 = sanitize(detail["nickname"] + "_" + detail["desc"]).substring(0, 170) + ".mp4";
         let tmp2 = sanitize(detail["nickname"] + "_" + detail["desc"]).substring(0, 170) + "_0" + ".jpg";
         if (file_list.includes(tmp1) || file_list.includes(tmp2)) {
-          process.stdout.write("exist\r\n");
+          process.stdout.write("    exist\r\n");
           continue;
+        }else{
+          process.stdout.write("\r\n");
         }
         if (detail["type"] == "video") {
           let filename = sanitize(detail["nickname"] + "_" + detail["desc"]).substring(0, 170) + ".mp4";
@@ -113,7 +135,8 @@ async function run() {
           }
         }
       } catch (e) {
-        fs.writeFileSync(log_file_path, new Date() + " " + target[i] + " : " + e + "\r\n", {
+        process.stdout.write("    error\r\n");
+        fs.writeFileSync(log_file_path, new Date() + " " + target[i] + " : " + e + " " + detail + "\r\n", {
           flag: "a",
         });
         // write to error.txt
@@ -135,28 +158,24 @@ async function run() {
   console.log("please manually check errors.txt");
 }
 
-var like_tab = "https://www.douyin.com/user/MS4wLjABAAAAEtx9PZ1XhEw-eB4fUg_t4M9OnspG38qgWLZW4cG4yrc?showTab=like";
-var context = null;
-var browser = null;
-var LIMIT = 2000;
-var isheadless = true;
+
 async function init() {
   browser = await firefox.launch({ headless: isheadless });
   context = await browser.newContext({
     userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:105.0) Gecko/20100101 Firefox/105.0",
-    viewport: { width: 2000, height: 1000 },
+    viewport: { width: 1600, height: 1200 },
   });
   context.setDefaultTimeout(1000000000);
 }
 
 // LIKE ADDRESS
 async function get_likes() {
-  let target_file_path = __dirname + "\\config\\target.txt";
+  // MARK
+  let target_file_path = target_config_path;
   // document.querySelector("div.FeJSrpNN:nth-child(3) > ul:nth-child(1)")
   let address = [];
   const page = await context.newPage();
   await page.goto(like_tab);
-
   let mannul = 0;
   //FIXME just find the verify page is sometimes appear
   if (mannul) {
@@ -239,8 +258,6 @@ async function get_like_list() {
   await get_likes();
 }
 
-var keep_mode_on = false;
-var time_to_wait = 1000 * 60 * 10; //  10 min
 
 async function keep_download_mode() {
   if (keep_mode_on == true) {
@@ -270,7 +287,12 @@ function stop_keep_download_mode() {
   }
 }
 
+async function download_from_target(){
+  await run();
+}
+
 module.exports = {
+  download_from_target,
   run,
   get_like_list,
   keep_download_mode,
